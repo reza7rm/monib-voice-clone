@@ -15,6 +15,7 @@ import threading
 
 CHATTERBOX_DIR = os.environ.get("CHATTERBOX_DIR", "/mnt/data/monib/chatterbox-finetuning")
 PORT = int(os.environ.get("PORT", "8200"))
+API_KEY = os.environ.get("TTS_API_KEY", "")
 MAX_CHARS = 20000
 SENT_SPLIT = re.compile(r"(?<=[.?!؟…؛])\s+")
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -24,8 +25,9 @@ sys.path.insert(0, CHATTERBOX_DIR)
 
 import numpy as np
 import soundfile as sf
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
+from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -71,8 +73,11 @@ def synthesize(text: str) -> str:
     pieces, sr = [], 24000
     for i, sent in enumerate(sentences):
         out = GEN(ENGINE, sent, AUDIO_PROMPT, **PARAMS)
+        if out is None:  # one retry — sampling occasionally misfires on a sentence
+            out = GEN(ENGINE, sent, AUDIO_PROMPT, **PARAMS)
         if out is None:
-            raise RuntimeError(f"generation failed on sentence {i + 1}: {sent[:60]}")
+            print(f"[tts] SKIPPED sentence {i + 1} after retry: {sent[:80]}")
+            continue
         sr, chunk = out
         pieces.append(_to_np(chunk))
         pieces.append(np.zeros(int(sr * 0.25), dtype=np.float32))  # 250ms gap
@@ -93,7 +98,9 @@ def health():
     return {"ok": True, "busy": LOCK.locked()}
 
 @app.post("/api/tts")
-def tts(body: TtsIn):
+def tts(body: TtsIn, request: Request = None):
+    if API_KEY and (request is None or request.headers.get("x-api-key") != API_KEY):
+        return JSONResponse({"error": "invalid api key"}, status_code=401)
     text = (body.text or "").strip()
     if not text:
         return JSONResponse({"error": "text is required"}, status_code=400)
@@ -104,7 +111,8 @@ def tts(body: TtsIn):
     try:
         path = synthesize(text)
         return FileResponse(path, media_type="audio/wav", filename="tts.wav",
-                            background=None, headers={"Cache-Control": "no-store"})
+                            background=BackgroundTask(os.remove, path),
+                            headers={"Cache-Control": "no-store"})
     except Exception as e:
         import traceback; traceback.print_exc()
         return JSONResponse({"error": str(e) or "generation failed"}, status_code=500)
