@@ -33,12 +33,15 @@
   <button id="go">تولید صدا</button>
   <span class="hint" id="count">۰ حرف — هر جمله جدا ساخته می‌شود، متن طولانی چند دقیقه طول می‌کشد</span>
 </div>
+<div class="row"><input id="key" type="password" placeholder="کلید API (اگر تنظیم شده)" style="font:inherit;padding:.5rem .8rem;border-radius:8px;border:1px solid light-dark(#ccc,#444);background:light-dark(#fff,#1c1c1c);color:inherit"/></div>
 <div class="err" id="err" hidden></div>
 <div id="result"></div>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const text = $("text"), go = $("go"), err = $("err"), result = $("result"), count = $("count");
+const text = $("text"), go = $("go"), err = $("err"), result = $("result"), count = $("count"), key = $("key");
+key.value = localStorage.getItem("tts-key") || "";
+key.addEventListener("input", () => localStorage.setItem("tts-key", key.value));
 let timer = null;
 
 text.addEventListener("input", () => {
@@ -58,7 +61,7 @@ go.addEventListener("click", async () => {
   try {
     const res = await fetch("/api/tts", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...(key.value ? { "x-api-key": key.value } : {}) },
       body: JSON.stringify({ text: t }),
     });
     if (!res.ok) {
