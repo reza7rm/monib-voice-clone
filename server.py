@@ -35,10 +35,9 @@ from pydantic import BaseModel
 # (the import-time self-test costs a few seconds instead of a full paragraph).
 print("[boot] loading Chatterbox engine (this takes a minute)...")
 _src = open("inference.py", encoding="utf-8").read()
-_src = re.sub(r'^(\s*)TEXT_TO_SAY = .*$', r'\1TEXT_TO_SAY = "سلام"', _src, count=1, flags=re.M)
 _mod = types.ModuleType("cb_inference")
-_mod.__dict__["__name__"] = "__main__"
 _mod.__dict__["__file__"] = os.path.join(CHATTERBOX_DIR, "inference.py")
+# __name__ != "__main__" → definitions only, no self-test generation at import.
 exec(compile(_src, "inference.py", "exec"), _mod.__dict__)
 
 def _need(name):
@@ -50,11 +49,15 @@ def _need(name):
         )
     return v
 
-ENGINE = _need("engine")
+import torch
+_device = "cuda" if torch.cuda.is_available() else "cpu"
+_loader = _need("load_finetuned_engine_lora") if _mod.__dict__.get("IS_LORA", True) \
+    else _need("load_finetuned_engine_full")
+ENGINE = _loader(_device)
 GEN = _need("generate_sentence_audio")
 AUDIO_PROMPT = _need("AUDIO_PROMPT")
 PARAMS = _mod.__dict__.get("PARAMS") or {}
-print("[boot] engine ready.")
+print(f"[boot] engine ready on {_device}.")
 
 LOCK = threading.Lock()  # one generation at a time — a single T4 serializes anyway
 
