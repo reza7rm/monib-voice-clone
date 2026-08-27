@@ -4,85 +4,152 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>" />
-<title>تبدیل متن به گفتار</title>
+<title>استودیو صدای مُنیب</title>
 <style>
-  :root { color-scheme: light dark; }
-  * { box-sizing: border-box; }
-  body { font-family: Vazirmatn, Tahoma, system-ui, sans-serif; max-width: 780px;
-         margin: 2rem auto; padding: 0 1rem; background: light-dark(#fafafa, #111);
-         color: light-dark(#1a1a1a, #eee); }
-  h1 { font-size: 1.3rem; }
-  textarea { width: 100%; min-height: 220px; font: inherit; font-size: 1.05rem; line-height: 1.9;
-             padding: .9rem; border-radius: 12px; border: 1px solid light-dark(#ccc, #444);
-             background: light-dark(#fff, #1c1c1c); color: inherit; resize: vertical; }
-  button { font: inherit; padding: .65rem 1.6rem; border-radius: 10px; border: 0; cursor: pointer;
-           background: #2563eb; color: #fff; }
-  button:disabled { opacity: .5; cursor: default; }
-  .row { display: flex; gap: 1rem; align-items: center; margin-top: .8rem; flex-wrap: wrap; }
-  .hint { color: light-dark(#666, #999); font-size: .85rem; }
-  .err { color: #dc2626; margin-top: .6rem; }
+  :root {
+    color-scheme: light dark;
+    --accent: #7c3aed; --accent2: #a78bfa;
+    --bg: light-dark(#f4f4f6, #0e0e12);
+    --card: light-dark(#ffffff, #1a1a22);
+    --line: light-dark(#e5e5ea, #2c2c38);
+    --text: light-dark(#17171c, #ececf2);
+    --muted: light-dark(#71717a, #9494a5);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: Vazirmatn, Tahoma, system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 1.2rem 1rem 4rem; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: .6rem 0 1.4rem; }
+  header h1 { font-size: 1.15rem; display: flex; gap: .5rem; align-items: center; }
+  header h1 .dot { width: .6rem; height: .6rem; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: inline-block; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 1.2rem; box-shadow: 0 1px 3px rgb(0 0 0 / .06); }
+  textarea { width: 100%; min-height: 200px; font: inherit; font-size: 1.05rem; line-height: 2; padding: 1rem;
+             border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: inherit; resize: vertical; }
+  textarea:focus, input:focus { outline: 2px solid var(--accent2); border-color: transparent; }
+  input { font: inherit; padding: .7rem .9rem; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: inherit; width: 100%; }
+  button { font: inherit; font-weight: 600; padding: .7rem 1.7rem; border-radius: 12px; border: 0; cursor: pointer;
+           background: linear-gradient(135deg, var(--accent), #9333ea); color: #fff; transition: opacity .15s, transform .1s; }
+  button:hover:not(:disabled) { transform: translateY(-1px); }
+  button:disabled { opacity: .45; cursor: default; transform: none; }
+  button.ghost { background: transparent; color: var(--muted); font-weight: 400; padding: .4rem .8rem; }
+  button.ghost:hover { color: var(--text); }
+  .row { display: flex; gap: .9rem; align-items: center; margin-top: 1rem; flex-wrap: wrap; }
+  .hint { color: var(--muted); font-size: .82rem; }
+  .err { color: #ef4444; margin-top: .7rem; font-size: .9rem; }
   audio { width: 100%; margin-top: 1rem; }
-  #result { margin-top: .5rem; }
-  a.dl { font-size: .9rem; }
+  h2 { font-size: .95rem; color: var(--muted); margin: 2rem 0 .8rem; }
+  .item { display: flex; flex-direction: column; gap: .5rem; padding: .9rem 1.1rem; border: 1px solid var(--line);
+          border-radius: 14px; background: var(--card); margin-bottom: .7rem; }
+  .item .top { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; }
+  .item .txt { font-size: .92rem; line-height: 1.8; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .item .meta { font-size: .78rem; color: var(--muted); white-space: nowrap; }
+  .item .actions { display: flex; gap: .4rem; align-items: center; }
+  .item audio { margin: 0; height: 2.2rem; }
+  /* login */
+  .login { max-width: 380px; margin: 14vh auto 0; display: flex; flex-direction: column; gap: .9rem; }
+  .login h1 { font-size: 1.3rem; text-align: center; margin-bottom: .6rem; }
+  .spin { display: inline-block; width: 1em; height: 1em; border: 2px solid #fff5; border-top-color: #fff;
+          border-radius: 50%; animation: r 0.8s linear infinite; vertical-align: -2px; margin-inline-start: .5rem; }
+  @keyframes r { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
-<h1>تبدیل متن به گفتار — صدای شبیه‌سازی‌شده</h1>
-<textarea id="text" dir="rtl" placeholder="متن فارسی را اینجا وارد کنید…"></textarea>
-<div class="row">
-  <button id="go">تولید صدا</button>
-  <span class="hint" id="count">۰ حرف — هر جمله جدا ساخته می‌شود، متن طولانی چند دقیقه طول می‌کشد</span>
-</div>
-<div class="row"><input id="key" type="password" placeholder="کلید API (اگر تنظیم شده)" style="font:inherit;padding:.5rem .8rem;border-radius:8px;border:1px solid light-dark(#ccc,#444);background:light-dark(#fff,#1c1c1c);color:inherit"/></div>
-<div class="err" id="err" hidden></div>
-<div id="result"></div>
-
+<div class="wrap" id="app"></div>
 <script>
-const $ = (id) => document.getElementById(id);
-const text = $("text"), go = $("go"), err = $("err"), result = $("result"), count = $("count"), key = $("key");
-key.value = localStorage.getItem("tts-key") || "";
-key.addEventListener("input", () => localStorage.setItem("tts-key", key.value));
-let timer = null;
+const app = document.getElementById("app");
+const api = (path, opts = {}) => fetch(path, { headers: { "content-type": "application/json" }, ...opts });
+const fmtDate = (ts) => new Date(ts * 1000).toLocaleString("fa-IR", { dateStyle: "short", timeStyle: "short" });
+const fmtDur = (s) => s >= 60 ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}` : `${s} ثانیه`;
 
-text.addEventListener("input", () => {
-  count.textContent = `${text.value.length} حرف — هر جمله جدا ساخته می‌شود، متن طولانی چند دقیقه طول می‌کشد`;
-});
+async function boot() {
+  const me = await (await api("/api/me")).json();
+  me.authed ? renderMain() : renderLogin();
+}
 
-go.addEventListener("click", async () => {
-  const t = text.value.trim();
-  if (!t) return;
-  err.hidden = true; result.innerHTML = "";
-  go.disabled = true;
-  const t0 = Date.now();
-  timer = setInterval(() => {
-    go.textContent = `در حال تولید… ${Math.round((Date.now() - t0) / 1000)} ثانیه`;
-  }, 1000);
-  go.textContent = "در حال تولید…";
-  try {
-    const res = await fetch("/api/tts", {
-      method: "POST",
-      headers: { "content-type": "application/json", ...(key.value ? { "x-api-key": key.value } : {}) },
-      body: JSON.stringify({ text: t }),
-    });
-    if (!res.ok) {
-      let msg = "خطا: " + res.status;
-      try { msg = (await res.json()).error || msg; } catch {}
-      throw new Error(msg);
-    }
-    const url = URL.createObjectURL(await res.blob());
-    const audio = document.createElement("audio");
-    audio.controls = true; audio.src = url; audio.autoplay = true;
-    const dl = document.createElement("a");
-    dl.className = "dl"; dl.href = url; dl.download = "tts.wav";
-    dl.textContent = "دانلود فایل صوتی";
-    result.append(audio, dl);
-  } catch (e) {
-    err.textContent = String(e.message || e); err.hidden = false;
-  } finally {
-    clearInterval(timer);
-    go.disabled = false; go.textContent = "تولید صدا";
+function renderLogin() {
+  app.innerHTML = `
+    <div class="login card">
+      <h1>🎙️ استودیو صدای مُنیب</h1>
+      <input id="u" placeholder="نام کاربری" autocomplete="username" />
+      <input id="p" type="password" placeholder="رمز عبور" autocomplete="current-password" />
+      <button id="go">ورود</button>
+      <div class="err" id="err" hidden></div>
+    </div>`;
+  const go = document.getElementById("go");
+  const submit = async () => {
+    go.disabled = true;
+    const res = await api("/api/login", { method: "POST", body: JSON.stringify({
+      username: document.getElementById("u").value, password: document.getElementById("p").value }) });
+    if (res.ok) return renderMain();
+    const e = document.getElementById("err");
+    e.textContent = (await res.json()).error || "خطا"; e.hidden = false; go.disabled = false;
+  };
+  go.onclick = submit;
+  app.querySelectorAll("input").forEach(i => i.addEventListener("keydown", e => e.key === "Enter" && submit()));
+}
+
+function renderMain() {
+  app.innerHTML = `
+    <header>
+      <h1><span class="dot"></span> استودیو صدای مُنیب</h1>
+      <button class="ghost" id="logout">خروج</button>
+    </header>
+    <div class="card">
+      <textarea id="text" placeholder="متن فارسی را اینجا وارد کنید…"></textarea>
+      <div class="row">
+        <button id="gen">تولید صدا</button>
+        <span class="hint" id="count">هر جمله جداگانه ساخته می‌شود — متن طولانی چند دقیقه زمان می‌برد</span>
+      </div>
+      <div class="err" id="err" hidden></div>
+      <div id="result"></div>
+    </div>
+    <h2>تاریخچه</h2>
+    <div id="history"></div>`;
+  document.getElementById("logout").onclick = async () => { await api("/api/logout", { method: "POST" }); renderLogin(); };
+  const text = document.getElementById("text"), gen = document.getElementById("gen"),
+        err = document.getElementById("err"), result = document.getElementById("result");
+  let timer;
+  gen.onclick = async () => {
+    const t = text.value.trim(); if (!t) return;
+    err.hidden = true; result.innerHTML = ""; gen.disabled = true;
+    const t0 = Date.now();
+    timer = setInterval(() => gen.innerHTML = `در حال تولید… ${Math.round((Date.now() - t0) / 1000)}s<span class="spin"></span>`, 1000);
+    try {
+      const res = await api("/api/tts", { method: "POST", body: JSON.stringify({ text: t }) });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "خطا: " + res.status);
+      result.innerHTML = `<audio controls autoplay src="/api/history/${j.item.id}/audio"></audio>`;
+      loadHistory();
+    } catch (e) { err.textContent = String(e.message || e); err.hidden = false; }
+    finally { clearInterval(timer); gen.disabled = false; gen.textContent = "تولید صدا"; }
+  };
+  loadHistory();
+}
+
+async function loadHistory() {
+  const box = document.getElementById("history");
+  const res = await api("/api/history");
+  if (!res.ok) return;
+  const { items } = await res.json();
+  box.innerHTML = items.length ? "" : `<p class="hint">هنوز صدایی تولید نشده است.</p>`;
+  for (const it of items) {
+    const div = document.createElement("div");
+    div.className = "item";
+    div.innerHTML = `
+      <div class="top"><div class="txt"></div>
+        <span class="meta">${fmtDate(it.created)} · ${fmtDur(it.duration)}${it.skipped ? " · ⚠️ " + it.skipped + " جمله رد شد" : ""}</span></div>
+      <div class="actions">
+        <audio controls preload="none" src="/api/history/${it.id}/audio"></audio>
+        <a href="/api/history/${it.id}/audio" download><button class="ghost">دانلود</button></a>
+        <button class="ghost del">حذف</button>
+      </div>`;
+    div.querySelector(".txt").textContent = it.text;
+    div.querySelector(".del").onclick = async () => {
+      await api("/api/history/" + it.id, { method: "DELETE" }); div.remove();
+    };
+    box.appendChild(div);
   }
-});
+}
+boot();
 </script>
 </body>
 </html>

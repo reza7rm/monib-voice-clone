@@ -31,12 +31,16 @@ CHATTERBOX_DIR=/mnt/data/monib/chatterbox-finetuning python server.py
 # detach: Ctrl-A then D
 ```
 
-## Production notes
+## Auth & history
 
-- **Auth:** set `TTS_API_KEY=<secret>` in the environment to require an `X-API-Key`
-  header on `/api/tts`. Without it the endpoint is open — do not expose the port
-  publicly unset.
-- **Survive reboots** — instead of screen, a systemd unit (`/etc/systemd/system/persian-tts.service`):
+- Login: set `TTS_USER` (default `admin`) and `TTS_PASS` (**required**) in the environment.
+  Sessions are cookie-based and live in server memory — a restart signs everyone out.
+- Every generation is saved under `history/` (wav + json) and listed in the UI with
+  play / download / delete. Set `HISTORY_DIR` to move storage (put it on the big disk).
+
+## Run as a service
+
+`/etc/systemd/system/persian-tts.service`:
 
 ```ini
 [Unit]
@@ -47,7 +51,8 @@ After=network.target
 User=aiclient
 WorkingDirectory=/mnt/data/monib/persian-tts-ui
 Environment=CHATTERBOX_DIR=/mnt/data/monib/chatterbox-finetuning
-Environment=TTS_API_KEY=change-me
+Environment=TTS_USER=admin
+Environment=TTS_PASS=change-me
 ExecStart=/mnt/data/monib/chatterbox-finetuning/.venv/bin/python server.py
 Restart=always
 RestartSec=5
@@ -58,6 +63,5 @@ WantedBy=multi-user.target
 
 `sudo systemctl daemon-reload && sudo systemctl enable --now persian-tts`
 
-- A failed sentence is retried once, then skipped (logged) rather than failing the
-  whole request. Temp WAVs are deleted after each response.
-- One generation at a time by design (single GPU); concurrent callers get HTTP 429.
+Notes: one generation at a time (HTTP 429 when busy); a failed sentence is retried
+once then skipped (flagged in history); temp-free — audio goes straight to history.
