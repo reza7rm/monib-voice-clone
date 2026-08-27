@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>" />
 <title>تبدیل متن به گفتار</title>
 <style>
   :root { color-scheme: light dark; }
@@ -21,63 +22,64 @@
   .hint { color: light-dark(#666, #999); font-size: .85rem; }
   .err { color: #dc2626; margin-top: .6rem; }
   audio { width: 100%; margin-top: 1rem; }
+  #result { margin-top: .5rem; }
   a.dl { font-size: .9rem; }
 </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="module">
-import React from "https://esm.sh/react@18";
-import { createRoot } from "https://esm.sh/react-dom@18/client";
-const h = React.createElement;
+<h1>تبدیل متن به گفتار — صدای شبیه‌سازی‌شده</h1>
+<textarea id="text" dir="rtl" placeholder="متن فارسی را اینجا وارد کنید…"></textarea>
+<div class="row">
+  <button id="go">تولید صدا</button>
+  <span class="hint" id="count">۰ حرف — هر جمله جدا ساخته می‌شود، متن طولانی چند دقیقه طول می‌کشد</span>
+</div>
+<div class="err" id="err" hidden></div>
+<div id="result"></div>
 
-function App() {
-  const [text, setText] = React.useState("");
-  const [busy, setBusy] = React.useState(false);
-  const [err, setErr] = React.useState(null);
-  const [audioUrl, setAudioUrl] = React.useState(null);
-  const [elapsed, setElapsed] = React.useState(0);
-  const timer = React.useRef(null);
+<script>
+const $ = (id) => document.getElementById(id);
+const text = $("text"), go = $("go"), err = $("err"), result = $("result"), count = $("count");
+let timer = null;
 
-  async function generate() {
-    setErr(null); setAudioUrl(null); setBusy(true); setElapsed(0);
-    const t0 = Date.now();
-    timer.current = setInterval(() => setElapsed(Math.round((Date.now() - t0) / 1000)), 1000);
-    try {
-      const res = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j.error || ("خطا: " + res.status));
-      }
-      const blob = await res.blob();
-      setAudioUrl(URL.createObjectURL(blob));
-    } catch (e) { setErr(String(e.message || e)); }
-    finally { setBusy(false); clearInterval(timer.current); }
+text.addEventListener("input", () => {
+  count.textContent = `${text.value.length} حرف — هر جمله جدا ساخته می‌شود، متن طولانی چند دقیقه طول می‌کشد`;
+});
+
+go.addEventListener("click", async () => {
+  const t = text.value.trim();
+  if (!t) return;
+  err.hidden = true; result.innerHTML = "";
+  go.disabled = true;
+  const t0 = Date.now();
+  timer = setInterval(() => {
+    go.textContent = `در حال تولید… ${Math.round((Date.now() - t0) / 1000)} ثانیه`;
+  }, 1000);
+  go.textContent = "در حال تولید…";
+  try {
+    const res = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: t }),
+    });
+    if (!res.ok) {
+      let msg = "خطا: " + res.status;
+      try { msg = (await res.json()).error || msg; } catch {}
+      throw new Error(msg);
+    }
+    const url = URL.createObjectURL(await res.blob());
+    const audio = document.createElement("audio");
+    audio.controls = true; audio.src = url; audio.autoplay = true;
+    const dl = document.createElement("a");
+    dl.className = "dl"; dl.href = url; dl.download = "tts.wav";
+    dl.textContent = "دانلود فایل صوتی";
+    result.append(audio, dl);
+  } catch (e) {
+    err.textContent = String(e.message || e); err.hidden = false;
+  } finally {
+    clearInterval(timer);
+    go.disabled = false; go.textContent = "تولید صدا";
   }
-
-  return h("div", null,
-    h("h1", null, "تبدیل متن به گفتار — صدای شبیه‌سازی‌شده"),
-    h("textarea", {
-      value: text, dir: "rtl", placeholder: "متن فارسی را اینجا وارد کنید…",
-      onChange: (e) => setText(e.target.value),
-    }),
-    h("div", { className: "row" },
-      h("button", { disabled: busy || !text.trim(), onClick: generate },
-        busy ? `در حال تولید… ${elapsed} ثانیه` : "تولید صدا"),
-      h("span", { className: "hint" }, `${text.length} حرف — هر جمله جدا ساخته می‌شود، متن طولانی چند دقیقه طول می‌کشد`)
-    ),
-    err && h("div", { className: "err" }, err),
-    audioUrl && h("div", null,
-      h("audio", { controls: true, src: audioUrl, autoPlay: true }),
-      h("a", { className: "dl", href: audioUrl, download: "tts.wav" }, "دانلود فایل صوتی")
-    )
-  );
-}
-createRoot(document.getElementById("root")).render(h(App));
+});
 </script>
 </body>
 </html>
