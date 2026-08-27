@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>تبدیل متن به گفتار</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { font-family: Vazirmatn, Tahoma, system-ui, sans-serif; max-width: 780px;
+         margin: 2rem auto; padding: 0 1rem; background: light-dark(#fafafa, #111);
+         color: light-dark(#1a1a1a, #eee); }
+  h1 { font-size: 1.3rem; }
+  textarea { width: 100%; min-height: 220px; font: inherit; font-size: 1.05rem; line-height: 1.9;
+             padding: .9rem; border-radius: 12px; border: 1px solid light-dark(#ccc, #444);
+             background: light-dark(#fff, #1c1c1c); color: inherit; resize: vertical; }
+  button { font: inherit; padding: .65rem 1.6rem; border-radius: 10px; border: 0; cursor: pointer;
+           background: #2563eb; color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 1rem; align-items: center; margin-top: .8rem; flex-wrap: wrap; }
+  .hint { color: light-dark(#666, #999); font-size: .85rem; }
+  .err { color: #dc2626; margin-top: .6rem; }
+  audio { width: 100%; margin-top: 1rem; }
+  a.dl { font-size: .9rem; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="module">
+import React from "https://esm.sh/react@18";
+import { createRoot } from "https://esm.sh/react-dom@18/client";
+const h = React.createElement;
+
+function App() {
+  const [text, setText] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+  const [audioUrl, setAudioUrl] = React.useState(null);
+  const [elapsed, setElapsed] = React.useState(0);
+  const timer = React.useRef(null);
+
+  async function generate() {
+    setErr(null); setAudioUrl(null); setBusy(true); setElapsed(0);
+    const t0 = Date.now();
+    timer.current = setInterval(() => setElapsed(Math.round((Date.now() - t0) / 1000)), 1000);
+    try {
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || ("خطا: " + res.status));
+      }
+      const blob = await res.blob();
+      setAudioUrl(URL.createObjectURL(blob));
+    } catch (e) { setErr(String(e.message || e)); }
+    finally { setBusy(false); clearInterval(timer.current); }
+  }
+
+  return h("div", null,
+    h("h1", null, "تبدیل متن به گفتار — صدای شبیه‌سازی‌شده"),
+    h("textarea", {
+      value: text, dir: "rtl", placeholder: "متن فارسی را اینجا وارد کنید…",
+      onChange: (e) => setText(e.target.value),
+    }),
+    h("div", { className: "row" },
+      h("button", { disabled: busy || !text.trim(), onClick: generate },
+        busy ? `در حال تولید… ${elapsed} ثانیه` : "تولید صدا"),
+      h("span", { className: "hint" }, `${text.length} حرف — هر جمله جدا ساخته می‌شود، متن طولانی چند دقیقه طول می‌کشد`)
+    ),
+    err && h("div", { className: "err" }, err),
+    audioUrl && h("div", null,
+      h("audio", { controls: true, src: audioUrl, autoPlay: true }),
+      h("a", { className: "dl", href: audioUrl, download: "tts.wav" }, "دانلود فایل صوتی")
+    )
+  );
+}
+createRoot(document.getElementById("root")).render(h(App));
+</script>
+</body>
+</html>
